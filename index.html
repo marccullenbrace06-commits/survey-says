@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SURVEY SAYS! - ESL Game</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --dark-blue: #001f3f;
+            --mid-blue: #0074D9;
+            --light-blue: #7FDBFF;
+            --gold: #FFDC00;
+            --white: #FFFFFF;
+            --red: #FF4136;
+            --panel-bg: rgba(0, 31, 63, 0.98);
+        }
+
+        * { box-sizing: border-box; font-family: 'Arial Black', Gadget, sans-serif; }
+
+        body, html {
+            margin: 0; padding: 0; height: 100%;
+            background-color: var(--dark-blue);
+            /* 20% Tint Overlay */
+            background-image: linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.2)), url('surveybg.png');
+            background-size: cover;
+            background-position: center;
+            color: var(--white);
+            overflow: hidden;
+        }
+
+        .screen {
+            display: none; height: 100vh; width: 100vw;
+            flex-direction: column; align-items: center; justify-content: center;
+            padding: 1vh; text-align: center;
+            position: absolute; top: 0; left: 0;
+        }
+        .screen.active { display: flex; z-index: 10; }
+
+        #screen-start { justify-content: flex-end; padding-bottom: 20vh; }
+
+        .btn {
+            background: var(--gold); color: var(--dark-blue);
+            border: 3px solid var(--white); padding: 12px 30px; font-size: 1.5rem;
+            font-weight: bold; border-radius: 12px; cursor: pointer;
+            transition: transform 0.1s, background 0.2s; 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            margin: 5px;
+        }
+        .btn:active { transform: scale(0.95); }
+        .btn-small { font-size: 0.9rem; padding: 5px 10px; }
+        .btn-green { background: #2ecc40; color: white; }
+        .btn-red { background: var(--red); color: white; }
+        
+        .icon-btn {
+            background: rgba(0,0,0,0.5); border: 2px solid white; color: white;
+            width: 45px; height: 45px; border-radius: 50%; cursor: pointer; margin: 0 5px;
+        }
+
+        .timer-preset-btn {
+            background: var(--mid-blue); color: white; border: 1px solid white;
+            padding: 5px 10px; border-radius: 5px; cursor: pointer; margin: 2px;
+        }
+
+        #wrong-x {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 25rem; color: var(--red); text-shadow: 0 0 50px black;
+            z-index: 3000; display: none; pointer-events: none;
+        }
+
+        #round-indicator { font-size: 1.8rem; color: var(--gold); height: 5vh; }
+        #question-display {
+            font-size: 2.2rem; text-shadow: 3px 3px 6px rgba(0,0,0,0.8);
+            margin: 1vh 0; color: var(--white); text-transform: uppercase;
+            width: 90%; min-height: 8vh; display: flex; align-items: center; justify-content: center;
+        }
+
+        .board-container {
+            display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(4, 1fr);
+            grid-auto-flow: column; gap: 10px 20px; width: 95%; max-width: 1200px; height: 45vh; 
+        }
+
+        /* The Slot itself is now transparent to show the bg through it */
+        .answer-slot { background: rgba(0, 26, 51, 0.4); border: 3px solid var(--light-blue); height: 100%; overflow: hidden; position: relative; }
+        .answer-card { width: 100%; height: 100%; position: relative; cursor: pointer; }
+
+        .card-front, .card-back {
+            position: absolute; width: 100%; height: 100%;
+            display: flex; align-items: center; font-size: 1.5rem;
+            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* UPDATED: Semi-transparent blue for the front of the cards */
+        .card-front { 
+            background: linear-gradient(180deg, rgba(0, 64, 128, 0.85) 0%, rgba(0, 43, 85, 0.85) 100%); 
+            justify-content: center; color: var(--light-blue); z-index: 2; 
+        }
+        
+        .card-back { background: linear-gradient(180deg, #2ecc40 0%, #25a034 100%); justify-content: space-between; color: white; border: 2px solid var(--gold); transform: translateY(100%); z-index: 1; }
+
+        .revealed .card-front { transform: translateY(-100%); }
+        .revealed .card-back { transform: translateY(0); }
+
+        .ans-text { flex: 1; text-align: left; padding-left: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ans-points { width: 80px; height: 100%; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.2); border-left: 4px solid var(--gold); font-size: 1.8rem; color: var(--gold); }
+        .answer-num { background: var(--light-blue); color: var(--dark-blue); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; }
+
+        #scoreboard { display: flex; gap: 20px; width: 100%; justify-content: center; margin-top: 10px; }
+        .team-box { position: relative; background: rgba(0, 0, 0, 0.5); padding: 10px 20px; min-width: 150px; border-radius: 10px; border: 4px solid #004080; cursor: pointer; }
+        .team-box.active { border-color: var(--gold); background: rgba(0, 116, 217, 0.6); }
+        
+        .timer-box { 
+            background: rgba(0, 0, 0, 0.5); padding: 10px 20px; min-width: 150px; 
+            border-radius: 10px; border: 4px solid var(--red); color: var(--red); 
+        }
+        .timer-box .score-val { color: var(--red); }
+        .score-val { font-size: 2rem; color: var(--gold); font-weight: bold; }
+
+        .score-animation {
+            position: absolute; top: -40px; left: 50%; transform: translateX(-50%);
+            color: var(--gold); font-weight: bold; font-size: 1.5rem;
+            animation: floatUp 1.5s forwards; pointer-events: none;
+            text-shadow: 2px 2px 4px black; white-space: nowrap;
+        }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translate(-50%, 0); }
+            100% { opacity: 0; transform: translate(-50%, -60px); }
+        }
+
+        #input-area { height: 8vh; display: flex; align-items: center; justify-content: center; }
+        #guess-input { padding: 10px; font-size: 1.8rem; border-radius: 8px; border: 4px solid var(--mid-blue); width: 450px; text-align: center; text-transform: uppercase; visibility: hidden; }
+
+        #settings-panel { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: var(--panel-bg); z-index: 2000; display: none; 
+            overflow-y: auto; padding: 40px 20px; 
+        }
+        .config-card { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #444; }
+        input[type="text"], input[type="number"] { padding: 8px; border-radius: 5px; border: 1px solid #777; margin: 2px; }
+    </style>
+</head>
+<body>
+
+    <div id="wrong-x"><i class="fas fa-times"></i></div>
+
+    <div style="position: absolute; top: 10px; right: 10px; z-index: 500; display: flex; flex-direction: column; align-items: flex-end;">
+        <div>
+            <button class="icon-btn" onclick="toggleSettings()"><i class="fas fa-cog"></i></button>
+            <button class="icon-btn" onclick="toggleFullscreen()"><i class="fas fa-expand"></i></button>
+            <button class="icon-btn" onclick="toggleSound()"><i id="sound-icon" class="fas fa-volume-up"></i></button>
+            <button class="icon-btn" onclick="goHome()"><i class="fas fa-home"></i></button>
+        </div>
+        <div style="margin-top: 10px;">
+            <button class="timer-preset-btn" onclick="startTimer(5)">5s</button>
+            <button class="timer-preset-btn" onclick="startTimer(10)">10s</button>
+            <button class="timer-preset-btn" onclick="startTimer(20)">20s</button>
+        </div>
+    </div>
+
+    <div id="screen-start" class="screen active">
+        <button class="btn" onclick="startGame()">START GAME</button>
+    </div>
+
+    <div id="screen-game" class="screen">
+        <div id="round-indicator">ROUND 1</div>
+        <div id="question-display">QUESTION?</div>
+        <div id="input-area"><input type="text" id="guess-input" placeholder="TYPE ANSWER..."></div>
+        <div class="board-container" id="board"></div>
+        <div id="scoreboard"></div>
+        <div style="height: 10vh; margin-top: 10px;">
+            <button id="next-round-btn" class="btn btn-green" style="display:none;" onclick="nextRound()">NEXT ROUND <i class="fas fa-arrow-right"></i></button>
+            <button id="view-rank-btn" class="btn" style="background: var(--light-blue); display:none;" onclick="showRanking()">VIEW RANKING <i class="fas fa-trophy"></i></button>
+        </div>
+    </div>
+
+    <div id="screen-ranking" class="screen">
+        <h1 style="font-size: 4rem;">🏆 FINAL RESULTS 🏆</h1>
+        <div id="ranking-list" style="font-size: 2.5rem; margin-bottom: 20px;"></div>
+        <button class="btn" onclick="goHome()">MAIN MENU</button>
+    </div>
+
+    <div id="settings-panel">
+        <div style="max-width: 900px; margin: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h1>TEACHER CONTROL PANEL</h1>
+                <button class="btn btn-red btn-small" onclick="toggleSettings()">CANCEL</button>
+            </div>
+            <div class="config-card">
+                <h3><i class="fas fa-file-import"></i> CLASS FILE MANAGEMENT</h3>
+                <button class="btn btn-small" onclick="exportData()"><i class="fas fa-download"></i> EXPORT (.json)</button>
+                <button class="btn btn-small" onclick="document.getElementById('importFile').click()"><i class="fas fa-upload"></i> IMPORT (.json)</button>
+                <input type="file" id="importFile" style="display:none" accept=".json" onchange="importData(event)">
+            </div>
+            <div class="config-card">
+                <h3>TEAMS</h3>
+                <div id="team-config-area"></div>
+                <button class="btn btn-small" onclick="adjustTeamCount(1)">+ Team</button>
+                <button class="btn btn-small" onclick="adjustTeamCount(-1)">- Team</button>
+            </div>
+            <div id="rounds-config"></div>
+            <button class="btn btn-green" onclick="addRound()">+ ADD NEW ROUND</button>
+            <div style="margin-top: 40px; border-top: 2px solid #555; padding-top: 20px;">
+                <button class="btn btn-green" style="width: 100%; font-size: 2rem;" onclick="saveData()">SAVE & START</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AUDIO ELEMENTS -->
+    <audio id="snd-correct" src="correctanswer.MP3"></audio>
+    <audio id="snd-wrong" src="wronganswer.MP3"></audio>
+    <audio id="snd-bg" src="bgmusic.MP3" loop></audio>
+
+    <script>
+        let gameState = {
+            currentRound: 0, activeTeam: 0, soundEnabled: true, revealedCount: 0,
+            teams: [{ name: "TEAM 1", score: 0 }, { name: "TEAM 2", score: 0 }],
+            rounds: [
+                { question: "THINGS FOUND IN A CLASSROOM", answers: [{ text: "PENCIL", pts: 35 }, { text: "ERASER", pts: 25 }, { text: "BOOK", pts: 20 }, { text: "DESK", pts: 15 }]}
+            ]
+        };
+
+        let timerInterval;
+
+        function init() {
+            const saved = localStorage.getItem('surveySaysV3');
+            if (saved) gameState = JSON.parse(saved);
+            renderSettings();
+            setupInput();
+            
+            // Set initial volumes
+            document.getElementById('snd-bg').volume = 0.3;
+            document.getElementById('snd-correct').volume = 1.0;
+            document.getElementById('snd-wrong').volume = 1.0;
+        }
+
+        function startGame() {
+            switchScreen('screen-game');
+            gameState.currentRound = 0;
+            gameState.teams.forEach(t => t.score = 0);
+            
+            if (gameState.soundEnabled) {
+                document.getElementById('snd-bg').play().catch(e => console.log("Music blocked"));
+            }
+            
+            loadRound(0);
+        }
+
+        function getMultiplier() {
+            let r = gameState.currentRound + 1;
+            if (r >= 5) return 3;
+            if (r >= 3) return 2;
+            return 1;
+        }
+
+        function loadRound(idx) {
+            clearInterval(timerInterval);
+            gameState.currentRound = idx;
+            gameState.revealedCount = 0;
+            const round = gameState.rounds[idx];
+            if(!round) { showRanking(); return; }
+
+            let mult = getMultiplier();
+            document.getElementById('round-indicator').innerText = `ROUND ${idx + 1} ${mult > 1 ? '('+mult+'X)' : ''}`;
+            document.getElementById('question-display').innerText = round.question;
+            document.getElementById('next-round-btn').style.display = 'none';
+            document.getElementById('view-rank-btn').style.display = 'none';
+            document.getElementById('guess-input').style.visibility = 'hidden';
+            
+            renderBoard();
+            renderScoreboard();
+        }
+
+        function renderBoard() {
+            const container = document.getElementById('board');
+            container.innerHTML = '';
+            const round = gameState.rounds[gameState.currentRound];
+            if(!round) return;
+
+            round.answers.forEach((ans, i) => {
+                const slot = document.createElement('div');
+                slot.className = 'answer-slot';
+                slot.innerHTML = `
+                    <div class="answer-card" id="card-${i}" onclick="handleReveal(${i})">
+                        <div class="card-front"><div class="answer-num">${i + 1}</div></div>
+                        <div class="card-back">
+                            <span class="ans-text">${ans.text}</span>
+                            <span class="ans-points">${ans.pts}</span>
+                        </div>
+                    </div>`;
+                container.appendChild(slot);
+            });
+        }
+
+        function handleReveal(index) {
+            const card = document.getElementById(`card-${index}`);
+            if (!card || card.classList.contains('revealed')) return;
+            
+            card.classList.add('revealed');
+            playSound('snd-correct'); 
+            
+            let originalPts = gameState.rounds[gameState.currentRound].answers[index].pts;
+            let mult = getMultiplier();
+            let addedPts = originalPts * mult;
+            
+            gameState.teams[gameState.activeTeam].score += addedPts;
+            gameState.revealedCount++;
+            
+            triggerScoreAnimation(addedPts, mult);
+            renderScoreboard();
+            checkRoundComplete();
+        }
+
+        function triggerScoreAnimation(pts, mult) {
+            const teamBoxes = document.querySelectorAll('.team-box');
+            const targetBox = teamBoxes[gameState.activeTeam];
+            if (!targetBox) return;
+
+            const anim = document.createElement('div');
+            anim.className = 'score-animation';
+            anim.innerText = `+${pts}${mult > 1 ? ' (' + mult + 'X BONUS!)' : ''}`;
+            targetBox.appendChild(anim);
+            
+            setTimeout(() => anim.remove(), 1500);
+        }
+
+        function checkGuess() {
+            const input = document.getElementById('guess-input');
+            const val = input.value.toUpperCase().trim();
+            input.style.visibility = 'hidden';
+            
+            if (!val) return;
+
+            const answers = gameState.rounds[gameState.currentRound].answers;
+            let foundIdx = answers.findIndex(a => a.text.toUpperCase() === val);
+            
+            if (foundIdx !== -1) {
+                handleReveal(foundIdx);
+            } else {
+                showWrongX();
+            }
+            input.value = ''; 
+        }
+
+        function showWrongX() {
+            const x = document.getElementById('wrong-x');
+            x.style.display = 'block';
+            playSound('snd-wrong');
+            setTimeout(() => { x.style.display = 'none'; }, 1200);
+        }
+
+        function startTimer(sec) {
+            clearInterval(timerInterval);
+            let count = sec;
+            document.getElementById('mini-timer-val').innerText = count;
+            timerInterval = setInterval(() => {
+                count--;
+                document.getElementById('mini-timer-val').innerText = count;
+                if (count <= 0) { clearInterval(timerInterval); showWrongX(); }
+            }, 1000);
+        }
+
+        function playSound(id) {
+            if(gameState.soundEnabled) {
+                const s = document.getElementById(id);
+                if(s) { s.currentTime = 0; s.play().catch(e => {}); }
+            }
+        }
+
+        function renderScoreboard() {
+            const container = document.getElementById('scoreboard');
+            const teamHtml = gameState.teams.map((team, idx) => `
+                <div class="team-box ${idx === gameState.activeTeam ? 'active' : ''}" onclick="gameState.activeTeam=${idx};renderScoreboard()">
+                    <div style="font-size:0.8rem">${team.name}</div>
+                    <div class="score-val">${team.score}</div>
+                </div>`).join('');
+            
+            container.innerHTML = teamHtml + `
+                <div class="timer-box">
+                    <div style="font-size:0.8rem">TIMER</div>
+                    <div id="mini-timer-val" class="score-val">0</div>
+                </div>`;
+        }
+
+        function setupInput() {
+            const input = document.getElementById('guess-input');
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    if (input.style.visibility === 'hidden') {
+                        input.style.visibility = 'visible';
+                        input.focus();
+                    } else if (document.activeElement === input) {
+                        checkGuess();
+                    }
+                }
+                if (e.key === 'Escape') {
+                    input.style.visibility = 'hidden';
+                    input.value = '';
+                }
+            });
+        }
+
+        function checkRoundComplete() {
+            const totalAnswers = gameState.rounds[gameState.currentRound].answers.length;
+            if (gameState.revealedCount >= totalAnswers) {
+                clearInterval(timerInterval);
+                const isLast = gameState.currentRound >= gameState.rounds.length - 1;
+                document.getElementById(isLast ? 'view-rank-btn' : 'next-round-btn').style.display = 'inline-block';
+                document.getElementById('guess-input').style.visibility = 'hidden';
+            }
+        }
+
+        function nextRound() { loadRound(gameState.currentRound + 1); }
+        function switchScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+        
+        function showRanking() {
+            switchScreen('screen-ranking');
+            const sorted = [...gameState.teams].sort((a,b) => b.score - a.score);
+            document.getElementById('ranking-list').innerHTML = sorted.map((t, i) => `<div>#${i+1} ${t.name}: ${t.score}</div>`).join('');
+        }
+
+        function toggleSettings() { 
+            const p = document.getElementById('settings-panel'); 
+            p.style.display = (p.style.display === 'block') ? 'none' : 'block'; 
+            if(p.style.display === 'block') renderSettings();
+        }
+
+        function renderSettings() {
+            document.getElementById('team-config-area').innerHTML = gameState.teams.map((t, i) => `
+                <input type="text" value="${t.name}" onchange="gameState.teams[${i}].name=this.value" placeholder="Team Name">
+            `).join('');
+
+            document.getElementById('rounds-config').innerHTML = gameState.rounds.map((r, ri) => `
+                <div class="config-card">
+                    <div style="display:flex; justify-content: space-between; margin-bottom:10px;">
+                        <strong>ROUND ${ri+1}</strong>
+                        <button class="btn-red btn-small" onclick="removeRound(${ri})"><i class="fas fa-trash"></i> Delete Round</button>
+                    </div>
+                    Q: <input type="text" value="${r.question}" onchange="gameState.rounds[${ri}].question=this.value" style="width:80%" placeholder="Question Text">
+                    <div style="margin-top:10px; padding-left:20px; border-left: 2px solid var(--mid-blue);">
+                        ${r.answers.map((a, ai) => `
+                            <div style="margin-bottom:5px;">
+                                <input type="text" value="${a.text}" onchange="gameState.rounds[${ri}].answers[${ai}].text=this.value.toUpperCase()" placeholder="Answer">
+                                <input type="number" value="${a.pts}" onchange="gameState.rounds[${ri}].answers[${ai}].pts=parseInt(this.value)" style="width:60px">
+                                <button class="btn-red btn-small" onclick="removeAnswer(${ri}, ${ai})">×</button>
+                            </div>
+                        `).join('')}
+                        <button class="btn-small btn-green" onclick="addAnswer(${ri})">+ Add Answer</button>
+                    </div>
+                </div>`).join('');
+        }
+
+        function adjustTeamCount(n) { 
+            if (n > 0 && gameState.teams.length < 8) gameState.teams.push({name: `TEAM ${gameState.teams.length+1}`, score: 0}); 
+            if (n < 0 && gameState.teams.length > 2) gameState.teams.pop(); 
+            renderSettings(); 
+        }
+        function addRound() { gameState.rounds.push({question: "NEW QUESTION", answers: [{text: "", pts: 0}]}); renderSettings(); }
+        function removeRound(ri) { gameState.rounds.splice(ri, 1); renderSettings(); }
+        function addAnswer(ri) { gameState.rounds[ri].answers.push({text: "", pts: 0}); renderSettings(); }
+        function removeAnswer(ri, ai) { gameState.rounds[ri].answers.splice(ai, 1); renderSettings(); }
+
+        function saveData() { 
+            localStorage.setItem('surveySaysV3', JSON.stringify(gameState)); 
+            toggleSettings(); 
+            if(document.getElementById('screen-game').classList.contains('active')) { loadRound(0); }
+        }
+
+        function exportData() {
+            const fileName = prompt("Enter a name for this save file:", "survey_says_class");
+            if (fileName === null) return; 
+            const finalName = (fileName.trim() === "") ? "survey_says_export" : fileName.trim();
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(gameState));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", finalName + ".json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    gameState = imported;
+                    renderSettings();
+                    alert("Class data loaded successfully!");
+                } catch (err) { alert("Error reading file."); }
+            };
+            reader.readAsText(file);
+        }
+
+        function toggleSound() { 
+            gameState.soundEnabled = !gameState.soundEnabled; 
+            const bgm = document.getElementById('snd-bg');
+            document.getElementById('sound-icon').className = gameState.soundEnabled ? 'fas fa-volume-up' : 'fas fa-volume-mute'; 
+            if (gameState.soundEnabled) {
+                if (document.getElementById('screen-game').classList.contains('active')) bgm.play();
+            } else {
+                bgm.pause();
+            }
+        }
+        
+        function toggleFullscreen() { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }
+        function goHome() { if(confirm("Quit current game?")) window.location.reload(); }
+
+        init();
+    </script>
+</body>
+</html>
